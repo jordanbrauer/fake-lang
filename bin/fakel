@@ -1,0 +1,73 @@
+#!/usr/bin/env php
+<?php
+
+\error_reporting(E_ALL);
+\ini_set('display_errors', 1);
+
+$isDebug = in_array('--debug', array_values($argv));
+$root = function ($path) {
+    return \realpath(\rtrim(__DIR__, '/').'/../'.ltrim($path, '/'));
+};
+$calcRuTime = function ($ru, $rus, $index) { 
+    return (($ru["ru_{$index}.tv_sec"] * 1000) + \intval(($ru["ru_{$index}.tv_usec"] / 1000))) - (($rus["ru_{$index}.tv_sec"] * 1000) + \intval(($rus["ru_{$index}.tv_usec"] / 1000)));
+};
+$calcMemUsage = function ($x) { 
+    return @\round($x / \pow(1024, ($i = \floor(\log($x, 1024)))), 2).' '.['b', 'kb', 'mb', 'gb', 'tb', 'pb'][$i]; 
+};
+$systemInformation = function () {
+    echo PHP_EOL." Welcome to"."
+    ______    _        _                       
+    |  ___|  | |      | |                      
+    | |_ __ _| | _____| |     __ _ _ __   __ _ 
+    |  _/ _` | |/ / _ \ |    / _` | '_ \ / _` |
+    | || (_| |   <  __/ |___| (_| | | | | (_| |
+    \_| \__,_|_|\_\___\_____/\__,_|_| |_|\__, |
+                                        __/   |
+                                        |___/ ";
+
+    echo PHP_EOL." Operating System: ".\php_uname('s')
+        .PHP_EOL." Machine Architecture: ".\php_uname('m')
+        .PHP_EOL." OS Version: ".\php_uname('v')
+        .PHP_EOL." OS Release: ".\php_uname('r')
+        .PHP_EOL." PHP SAPI Version: ".\phpversion()." (".\php_sapi_name().")"
+        .PHP_EOL." Zend Version: ".\zend_version()
+        .PHP_EOL." PHP Memory Limit: ".\ini_get('memory_limit')
+        .PHP_EOL;
+};
+
+require_once $root('vendor/autoload.php');
+
+if ($isDebug) {
+    $systemInformation();
+
+    echo PHP_EOL." ------------------------------"
+        .PHP_EOL;
+    
+    $time = -\microtime(true);
+    $ruBegin = \getrusage();
+}
+
+$tokenCount = 0;
+$input = file_get_contents($root('test.fl'));
+$lexer = new \FakeLang\Lexer($input);
+
+foreach ($lexer->tokens() as $token) {
+    dump($token);
+    $tokenCount++;
+}
+
+if ($isDebug) {
+    $allocatedMemory = \memory_get_usage(true);
+    $ruEnd = \getrusage();
+    $time += \microtime(true);
+    
+    echo PHP_EOL." Script Length: {$lexer->length()} characters" 
+        .PHP_EOL." Token Count: {$tokenCount}"
+        .PHP_EOL." Memory Usage: {$calcMemUsage($allocatedMemory)}"
+        .PHP_EOL." Clock Time: ".\number_format($time, 2)." s"
+        .PHP_EOL." Process Computation Time: {$calcRuTime($ruEnd, $ruBegin, 'utime')} ms"
+        .PHP_EOL." System Call Time: {$calcRuTime($ruEnd, $ruBegin, 'stime')} ms"
+        .PHP_EOL
+        .PHP_EOL.\sprintf(" Parsed script in %s second(s)", \number_format(($time), 0))
+        .PHP_EOL;
+}
